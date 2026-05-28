@@ -27,11 +27,8 @@ jobs:
           jupyter lite build --contents content --output-dir dist
       - name: Create site tarball
         run: |
-          tar \
-            --exclude='./jupyterlite-site.tar.gz' \
-            -C dist \
-            -czf dist/jupyterlite-site.tar.gz \
-            .
+          tar -C dist -czf /tmp/jupyterlite-site.tar.gz .
+          cp /tmp/jupyterlite-site.tar.gz dist/jupyterlite-site.tar.gz
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
