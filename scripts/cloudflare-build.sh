@@ -16,7 +16,7 @@ jupyter-builder --version || true
 echo "=== Build jl-moodle-session ==="
 cd extension-src/jl-moodle-session
 
-npm ci
+npm install
 
 npm run build:lib
 
