@@ -1,17 +1,23 @@
 {
   "compilerOptions": {
-    "declaration": true,
-    "esModuleInterop": true,
-    "incremental": true,
+    "target": "ES2018",
     "module": "ESNext",
     "moduleResolution": "Node",
-    "noEmitOnError": true,
+    "lib": [
+      "ES2018",
+      "DOM"
+    ],
+    "declaration": true,
+    "sourceMap": true,
     "outDir": "lib",
     "rootDir": "src",
     "strict": true,
-    "target": "ES2018"
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "incremental": true
   },
   "include": [
-    "src/**/*"
+    "src/**/*.ts",
+    "src/**/*.tsx"
   ]
 }

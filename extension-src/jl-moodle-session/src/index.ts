@@ -2,127 +2,151 @@ import {
   JupyterFrontEnd,
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
+
 import { IStatusBar } from '@jupyterlab/statusbar';
 import { Widget } from '@lumino/widgets';
 
 const SESSION_API =
   'https://jl-lti.morecatlab.workers.dev/api/session';
 
-interface SessionResponse {
+interface MoodleSession {
   authenticated: boolean;
   user?: string;
   course?: {
-    id: string;
-    title: string;
+    id?: string;
+    title?: string;
   };
   roles?: string[];
   resourceLinkId?: string;
-  error?: string;
 }
 
-class MoodleSessionStatus extends Widget {
-  constructor() {
-    super();
-    this.node.style.padding = '0 8px';
-    this.node.style.whiteSpace = 'nowrap';
-    this.node.title = 'Moodle LTI session';
-    this.setText('Moodle: 確認中...');
-  }
-
-  setText(text: string): void {
-    this.node.textContent = text;
+declare global {
+  interface Window {
+    jlMoodleSession?: MoodleSession;
   }
 }
 
-async function getMoodleSession(): Promise<SessionResponse> {
-  const response = await fetch(SESSION_API, {
-    method: 'GET',
-    credentials: 'include',
-    cache: 'no-store',
-    headers: {
-      Accept: 'application/json'
-    }
-  });
-
-  let data: SessionResponse;
-
+async function loadMoodleSession(
+  statusWidget: Widget | null
+): Promise<void> {
   try {
-    data = (await response.json()) as SessionResponse;
-  } catch {
-    throw new Error(
-      `Session API returned non-JSON data (HTTP ${response.status})`
+    console.log(
+      '[jl-moodle-session] requesting Moodle session'
     );
-  }
 
-  if (!response.ok) {
-    throw new Error(
-      data.error || `Session API error (HTTP ${response.status})`
+    const response = await fetch(SESSION_API, {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Session API returned HTTP ${response.status}`
+      );
+    }
+
+    const session =
+      (await response.json()) as MoodleSession;
+
+    window.jlMoodleSession = session;
+
+    console.log(
+      '[jl-moodle-session] Moodle session:',
+      session
     );
-  }
 
-  return data;
+    if (statusWidget) {
+      if (session.authenticated) {
+        const course =
+          session.course?.title || session.course?.id || '?';
+
+        const user =
+          session.user || '?';
+
+        const role =
+          session.roles?.join(', ') || '?';
+
+        statusWidget.node.textContent =
+          `Moodle: ${course} / User ${user} / ${role}`;
+
+        statusWidget.node.title =
+          `Moodle course: ${course}\n` +
+          `User: ${user}\n` +
+          `Role: ${role}`;
+      } else {
+        statusWidget.node.textContent =
+          'Moodle: not authenticated';
+      }
+    }
+  } catch (error) {
+    console.error(
+      '[jl-moodle-session] session fetch failed:',
+      error
+    );
+
+    if (statusWidget) {
+      statusWidget.node.textContent =
+        'Moodle: session unavailable';
+    }
+  }
 }
 
 const plugin: JupyterFrontEndPlugin<void> = {
   id: '@morecatlab/jl-moodle-session:plugin',
+
   autoStart: true,
+
+  /*
+   * IStatusBar is optional so that failure to obtain
+   * the status bar never blocks JupyterLite startup.
+   */
   optional: [IStatusBar],
 
-  activate: async (
-    app: JupyterFrontEnd,
+  activate: (
+    _app: JupyterFrontEnd,
     statusBar: IStatusBar | null
-  ): Promise<void> => {
-    console.log('[jl-moodle-session] extension activated');
+  ): void => {
+    console.log(
+      '[jl-moodle-session] extension activated'
+    );
 
-    const status = new MoodleSessionStatus();
+    let statusWidget: Widget | null = null;
 
     if (statusBar) {
+      statusWidget = new Widget();
+
+      statusWidget.node.textContent =
+        'Moodle: connecting...';
+
+      statusWidget.node.title =
+        'Moodle LTI session';
+
       statusBar.registerStatusItem(
         '@morecatlab/jl-moodle-session:status',
         {
-          item: status,
+          item: statusWidget,
           align: 'left',
-          rank: 5
+          rank: 10
         }
+      );
+    } else {
+      console.warn(
+        '[jl-moodle-session] status bar is not available'
       );
     }
 
-    await app.started;
-
-    try {
-      const session = await getMoodleSession();
-
-      console.log('[jl-moodle-session] Moodle session:', session);
-
-      if (!session.authenticated) {
-        status.setText('Moodle: 未認証');
-        return;
-      }
-
-      const user = session.user || '?';
-      const courseTitle =
-        session.course?.title || session.course?.id || '?';
-      const role =
-        session.roles && session.roles.length > 0
-          ? session.roles.join(', ')
-          : '?';
-
-      status.setText(
-        `Moodle: ${courseTitle} / User ${user} / ${role}`
-      );
-
-      (
-        window as Window & {
-          jlMoodleSession?: SessionResponse;
-        }
-      ).jlMoodleSession = session;
-    } catch (error) {
-      console.error(
-        '[jl-moodle-session] Failed to load Moodle session:',
-        error
-      );
-      status.setText('Moodle: セッション取得失敗');
-    }
+    /*
+     * IMPORTANT:
+     * Do not await this.
+     *
+     * Moodle API communication must never block
+     * JupyterLite startup.
+     */
+    void loadMoodleSession(statusWidget);
   }
 };
 
