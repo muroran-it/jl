@@ -15,7 +15,9 @@
     "clean": "rimraf lib labextension tsconfig.tsbuildinfo"
   },
   "dependencies": {
-    "@jupyterlab/application": "4.5.1"
+    "@jupyterlab/application": "4.5.1",
+    "@jupyterlab/statusbar": "4.5.1",
+    "@lumino/widgets": "^2.7.1"
   },
   "devDependencies": {
     "@jupyterlab/builder": "^4.5.10",
@@ -26,7 +28,7 @@
     "extension": true,
     "outputDir": "labextension",
     "_build": {
-      "load": "static/remoteEntry.32ec2370c98b6d02ac15.js",
+      "load": "static/remoteEntry.674031260d49ac62c85b.js",
       "extension": "./extension"
     }
   }
